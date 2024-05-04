@@ -16,6 +16,10 @@ const db = {
   getAllItems: () => {
     return Item.find();
   },
+  // get orders
+  getAllOrders: () => {
+    return Order.find();
+  },
 
   addNewItem: (data) => {
     const newItem = new Item(data);
