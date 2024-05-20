@@ -9,6 +9,8 @@ const ItemSchema = new Schema({
 
 const ItemsListSchema = new Schema({
   items: [ItemSchema],
+  date: { type: String, required: true },
+  time: { type: String, required: true },
 });
 
 module.exports = mongoose.model('ItemsList', ItemsListSchema);

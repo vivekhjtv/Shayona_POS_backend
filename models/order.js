@@ -9,6 +9,8 @@ const OrderSchema = new Schema({
 
 const OrderListSchema = new Schema({
   orders: [OrderSchema],
+  date: { type: String, required: true },
+  time: { type: String, required: true },
 });
 
 module.exports = mongoose.model('OrdersList', OrderListSchema);

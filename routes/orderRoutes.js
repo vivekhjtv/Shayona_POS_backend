@@ -12,7 +12,6 @@ router
   .get(async (req, res) => {
     try {
       const orders = await db.getAllOrders();
-      console.log(orders);
       res.status(200).json(orders);
     } catch (err) {
       console.error('Error fetching orders:', err);
@@ -21,7 +20,6 @@ router
   })
   .post(async (req, res) => {
     try {
-      // console.log(req.body);
       const newItem = await db.addDoneOrders(req.body);
       res.status(201).json(newItem);
     } catch (err) {

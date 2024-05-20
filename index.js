@@ -10,7 +10,6 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 8000;
 const dbUrl = process.env.DB_URL;
-
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
