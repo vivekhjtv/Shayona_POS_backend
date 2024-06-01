@@ -9,6 +9,7 @@ const ItemSchema = new Schema({
 
 const ItemsListSchema = new Schema({
   items: [ItemSchema],
+  customerName: { type: String, required: true },
   date: { type: String, required: true },
   time: { type: String, required: true },
 });

@@ -20,6 +20,7 @@ router
   })
   .post(async (req, res) => {
     try {
+      console.log(req.body);
       const newItem = await db.addNewItem(req.body);
       res.status(201).json(newItem);
     } catch (err) {

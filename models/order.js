@@ -9,6 +9,7 @@ const OrderSchema = new Schema({
 
 const OrderListSchema = new Schema({
   orders: [OrderSchema],
+  customerName: { type: String, required: true },
   date: { type: String, required: true },
   time: { type: String, required: true },
 });
