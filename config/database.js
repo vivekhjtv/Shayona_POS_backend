@@ -42,6 +42,7 @@ const db = {
     return newItem.save();
   },
   addNewStoreOrder: (data) => {
+    console.log('Store order db---', data);
     const newStoreItem = new StoreOrder(data);
     return newStoreItem.save();
   },
