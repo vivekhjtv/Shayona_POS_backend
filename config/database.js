@@ -4,6 +4,7 @@ const Order = require('../models/order');
 const StoreOrder = require('../models/storeOrder');
 const Stock = require('../models/stock');
 const Store = require('../models/stores');
+const OrderForm = require('../models/orderForm');
 
 const db = {
   initialize: async (url) => {
@@ -69,6 +70,47 @@ const db = {
   },
   deleteStore: (orderId) => {
     return StoreOrder.deleteOne({ _id: orderId });
+  },
+
+  // form order api
+  addNewOrderForms: (data) => {
+    const newItem = new OrderForm(data);
+    return newItem.save();
+  },
+  getOrderForms: () => {
+    return OrderForm.find();
+  },
+  updateOrderForm: async (orderId, updatedOrder) => {
+    try {
+      // Validate if orderId is a valid ObjectId
+      if (!mongoose.Types.ObjectId.isValid(orderId)) {
+        throw new Error('Invalid order ID');
+      }
+      console.log(orderId);
+      console.log(updatedOrder);
+      // Update the order form in the database
+      const updatedItem = await OrderForm.findByIdAndUpdate(
+        orderId,
+        updatedOrder,
+        { new: true }
+      );
+
+      if (!updatedItem) {
+        throw new Error('Order not found');
+      }
+
+      return updatedItem;
+    } catch (error) {
+      throw new Error(`Error updating order form: ${error.message}`);
+    }
+  },
+  deleteOrderForm: async (orderId) => {
+    try {
+      const deletedOrder = await OrderForm.findByIdAndDelete(orderId);
+      return deletedOrder;
+    } catch (error) {
+      throw new Error(`Error deleting order form: ${error.message}`);
+    }
   },
 };
 

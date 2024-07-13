@@ -7,7 +7,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const storeRoutes = require('./routes/storeRoutes');
 const storesRoutes = require('./routes/storesRoutes');
 const stockRoutes = require('./routes/stockRoutes');
-
+const orderFormRoutes = require('./routes/orderFormRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -31,6 +31,7 @@ db.initialize(process.env.DB_URL)
     app.use('/api/store-order', storeRoutes);
     app.use('/api/store', storesRoutes);
     app.use('/api/stock', stockRoutes);
+    app.use('/api/orderForm', orderFormRoutes);
 
     // Start the server
     app.listen(port, () => {
