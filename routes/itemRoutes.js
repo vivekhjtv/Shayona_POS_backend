@@ -60,8 +60,6 @@ router
         Buffer.from('\n\n\n\n\n'), // Add margins and spacing
       ]);
 
-      console.log(receiptData.toString());
-
       // Find the USB device
       const device = usb.findByIds(VENDOR_ID, PRODUCT_ID);
 
