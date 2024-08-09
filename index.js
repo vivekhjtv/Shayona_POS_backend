@@ -20,8 +20,8 @@ app.use(bodyParser.json());
 // CORS configuration: Adjust this as per your needs
 app.use(
   cors({
-    origin: 'https://shayona-pos.vercel.app', // Allow only your React app's origin
-    methods: ['GET, POST, PUT, DELETE , OPTIONS'], // Allowed methods
+    origin: '*', // Allow all origins
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed methods
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true, // Allow cookies to be sent with requests
   })
