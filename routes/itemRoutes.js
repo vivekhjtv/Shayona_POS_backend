@@ -1,145 +1,61 @@
-// const usb = require('usb');
-// const express = require('express');
-// const router = express.Router();
-// const db = require('../config/database');
-
-// // Replace these with your actual Vendor ID and Product ID
-// const VENDOR_ID = 0x1504; // e.g., 0x1234
-// const PRODUCT_ID = 0x003d; // e.g., 0x5678
-
-// router.use('/api/items/', (req, res, next) => {
-//   next();
-// });
-
-// router
-//   .route('/')
-//   .get(async (req, res) => {
-//     try {
-//       const items = await db.getAllItems();
-//       res.status(200).json(items);
-//     } catch (err) {
-//       console.error('Error fetching items:', err);
-//       res.status(500).json({ error: 'Internal Server Error' });
-//     }
-//   })
-//   .post(async (req, res) => {
-//     try {
-//       // Add new item to the database
-//       const newItem = await db.addNewItem(req.body);
-
-//       // Prepare the receipt data with ESC/POS commands for formatting
-//       const { items, customerName, date, time } = req.body;
-
-//       // ESC/POS commands
-//       const ESC = Buffer.from([0x1b]);
-//       const CENTER_ALIGN = Buffer.from([0x1b, 0x61, 0x01]); // Center alignment
-//       const LEFT_ALIGN = Buffer.from([0x1b, 0x61, 0x00]); // Left alignment
-//       const BOLD_ON = Buffer.from([0x1b, 0x45, 0x01]); // Enable bold
-//       const BOLD_OFF = Buffer.from([0x1b, 0x45, 0x00]); // Disable bold
-//       const LARGE_TEXT = Buffer.from([0x1d, 0x21, 0x11]); // Set larger text size (varies by printer)
-//       const NORMAL_TEXT = Buffer.from([0x1d, 0x21, 0x00]); // Reset to normal text size
-//       const CUT_PAPER = Buffer.from([0x1d, 0x56, 0x00]); // Cut command
-
-//       // Create receipt data with ESC/POS commands
-//       let receiptData = Buffer.concat([
-//         ESC,
-//         CENTER_ALIGN, // Center align
-//         LARGE_TEXT, // Larger font size
-//         Buffer.from(`"BAPS Shayona"\n`),
-//         NORMAL_TEXT, // Reset to normal font size
-//         LEFT_ALIGN, // Left align
-//         Buffer.from(`Customer: ${customerName}\n`),
-//         Buffer.from(`Date: ${date}\n`),
-//         Buffer.from(`Time: ${time}\n`),
-//         Buffer.from(`Items:\n`),
-//         BOLD_ON, // Start bold text
-//         ...items.map((item) => Buffer.from(`${item.name}: ${item.quantity}\n`)),
-//         BOLD_OFF, // End bold text
-//         Buffer.from('----------------------\n'),
-//         Buffer.from('Thank you for your purchase!\n'),
-//         Buffer.from('\n\n\n\n\n'), // Add margins and spacing
-//       ]);
-
-//       // Find the USB device
-//       const device = usb.findByIds(VENDOR_ID, PRODUCT_ID);
-
-//       if (!device) {
-//         return res.status(500).json({ error: 'Printer not found' });
-//       }
-
-//       device.open();
-//       const iface = device.interfaces[0];
-//       iface.claim();
-
-//       // Find the endpoint (usually endpoint 0x01 for output)
-//       const endpoint = iface.endpoints.find((ep) => ep.direction === 'out');
-//       if (!endpoint) {
-//         return res.status(500).json({ error: 'Endpoint not found' });
-//       }
-
-//       // Send the data to the printer in chunks
-//       const CHUNK_SIZE = 4096; // Adjust chunk size as needed
-
-//       function sendChunk(offset) {
-//         if (offset >= receiptData.length) {
-//           // Send the cut command after all data is sent
-//           setTimeout(() => {
-//             endpoint.transfer(CUT_PAPER, (error) => {
-//               if (error) {
-//                 console.error('Failed to send cut command:', error);
-//                 return res.status(500).json({ error: 'Failed to cut paper' });
-//               }
-
-//               console.log('Receipt printed and cut successfully');
-//               res.status(201).json({
-//                 message: 'Item added and receipt printed successfully',
-//               });
-//             });
-//           }, 1000); // Adjust delay as needed
-//           return;
-//         }
-
-//         const chunk = receiptData.slice(offset, offset + CHUNK_SIZE);
-//         endpoint.transfer(chunk, (error) => {
-//           if (error) {
-//             console.error('Failed to send data chunk:', error);
-//             return res.status(500).json({ error: 'Failed to print data' });
-//           }
-
-//           // Send next chunk
-//           sendChunk(offset + CHUNK_SIZE);
-//         });
-//       }
-
-//       // Start sending chunks
-//       sendChunk(0);
-//     } catch (err) {
-//       console.error('Error adding new items:', err);
-//       res.status(500).json({ error: 'Internal Server Error' });
-//     }
-//   });
-
-// router.route('/:itemId').delete(async (req, res) => {
-//   try {
-//     const deletedItem = await db.deleteItem(req.params.itemId);
-//     if (!deletedItem) {
-//       return res.status(404).json({ error: 'Item not found' });
-//     }
-//     res.status(200).json({ message: 'Item deleted successfully' });
-//   } catch (err) {
-//     console.error('Error deleting item:', err);
-//     res.status(500).json({ error: 'Internal Server Error' });
-//   }
-// });
-
-// module.exports = router;
-
-// -------------------- Working Code ----------------------------------------------------------
-
 const express = require('express');
+const net = require('net');
 const router = express.Router();
 const db = require('../config/database');
+require('dotenv').config();
 
+const IP = process.env.PRINTER_IP;
+const PRINTER_PORT = 9100; // Default port for network printers
+
+// Function to send data to the printer
+const sendToPrinter = (data) => {
+  return new Promise((resolve, reject) => {
+    const client = new net.Socket();
+    client.connect(PRINTER_PORT, IP, () => {
+      console.log('Connected to printer');
+
+      // Write receipt data first
+      client.write(data, 'binary', (err) => {
+        if (err) {
+          return reject('Error writing to printer: ' + err);
+        }
+        console.log('Data sent to printer');
+
+        // Introduce a delay to ensure the printer finishes printing the data
+        setTimeout(() => {
+          // Add 20 lines of space (adjust as needed)
+          const spaceLines = Buffer.from([0x1B, 0x4A, 0x14]); // ESC/POS command for line feed (20 lines)
+          client.write(spaceLines, 'binary', (spaceErr) => {
+            if (spaceErr) {
+              return reject('Error sending space command: ' + spaceErr);
+            }
+
+            // Send cut command
+            const cutCommand = Buffer.from([0x1D, 0x56, 0x00]); // ESC/POS command for full cut
+            client.write(cutCommand, 'binary', (cutErr) => {
+              if (cutErr) {
+                return reject('Error sending cut command: ' + cutErr);
+              }
+              client.end(); // Close the connection after sending data
+              console.log('Paper cut command sent');
+              resolve();
+            });
+          });
+        }, 1000); // Delay to ensure the receipt data is printed (1000ms)
+      });
+    });
+
+    client.on('error', (err) => {
+      reject('Printer connection error: ' + err);
+    });
+
+    client.on('close', () => {
+      console.log('Connection to printer closed');
+    });
+  });
+};
+
+// Middleware
 router.use('/api/items/', (req, res, next) => {
   next();
 });
@@ -158,12 +74,54 @@ router
   })
   .post(async (req, res) => {
     try {
-      console.log(req.body);
+      console.log('Items :- ', req.body);
       const newItem = await db.addNewItem(req.body);
-      res.status(201).json(newItem);
+
+      // Print receipt after adding new item
+      const { items, customerName, date, time } = req.body;
+
+      // Define receipt content with styling
+      const ESC = '\x1B'; // ESC byte in hex notation
+      const GS = '\x1D'; // GS byte in hex notation for some advanced commands
+      const newLine = '\n';
+      const boldOn = ESC + 'E' + '\x01'; // ESC/POS command for bold on
+      const boldOff = ESC + 'E' + '\x00'; // ESC/POS command for bold off
+      const centerAlign = ESC + 'a' + '\x01'; // ESC/POS command for center alignment
+      const leftAlign = ESC + 'a' + '\x00'; // ESC/POS command for left alignment
+      const doubleSizeOn = GS + '!' + '\x11'; // ESC/POS command for double height and width text
+      const normalSize = GS + '!' + '\x00'; // ESC/POS command for normal text size
+
+      let receiptData = `${centerAlign}${doubleSizeOn}${boldOn}BAPS Shayona${boldOff}${normalSize}${newLine}`;
+      receiptData += `${leftAlign}-----------------------------------------${newLine}`;
+      receiptData += `${boldOn}Customer:${boldOff} ${customerName}${newLine}`;
+      receiptData += `${boldOn}Date:${boldOff} ${date}${newLine}`;
+      receiptData += `${boldOn}Time:${boldOff} ${time}${newLine}`;
+      receiptData += `${boldOn}Items:${boldOff}${newLine}`;
+
+      // Make all items bold and in larger font size
+      items.forEach((item) => {
+        receiptData += `${doubleSizeOn}${boldOn}${item.name}: ${item.quantity}${boldOff}${normalSize}${newLine}`;
+      });
+
+      receiptData += '-----------------------------------------' + newLine;
+      receiptData += `${centerAlign}${boldOn}Thank you for your purchase!${boldOff}${newLine}`;
+      receiptData += newLine.repeat(5); // Add 5 new lines (adjust as needed)
+
+      // Convert receipt data to buffer and send to printer
+      const receiptBuffer = Buffer.from(receiptData, 'utf8');
+
+      try {
+        await sendToPrinter(receiptBuffer);
+        res.status(201).json(newItem);
+      } catch (printerError) {
+        console.error(printerError);
+        res.status(500).json({ error: 'Failed to print receipt' });
+      }
     } catch (err) {
       console.error('Error adding new items:', err);
-      res.status(500).json({ error: 'Internal Server Error' });
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
     }
   });
 
