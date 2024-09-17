@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
 const StockSchema = new Schema({
@@ -8,8 +8,10 @@ const StockSchema = new Schema({
   veg_pizza: { type: String, required: true },
   cheese_pizza: { type: String, required: true },
   thali: { type: String, required: true },
+  pesto: { type: String, required: true },
+  chat: { type: String, required: true },
   easternDate: { type: String, required: true },
   easternTime: { type: String, required: true },
 });
 
-module.exports = mongoose.model('StockOrder', StockSchema);
+module.exports = mongoose.model("StockOrder", StockSchema);
