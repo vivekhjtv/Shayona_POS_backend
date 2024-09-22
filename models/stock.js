@@ -10,6 +10,9 @@ const StockSchema = new Schema({
   thali: { type: String, required: true },
   pesto: { type: String, required: true },
   chat: { type: String, required: true },
+  lemonade: { type: String, required: true },
+  tea: { type: String, required: true },
+  coffee: { type: String, required: true },
   easternDate: { type: String, required: true },
   easternTime: { type: String, required: true },
 });
