@@ -5,12 +5,61 @@ const StoreOrder = require('../models/storeOrder');
 const Stock = require('../models/stock');
 const Store = require('../models/stores');
 const OrderForm = require('../models/orderForm');
+const Product = require('../models/product');
+
+const seedDefaultProducts = async () => {
+  try {
+    const invalidProducts = await Product.find({ key: { $exists: false } });
+    if (invalidProducts.length > 0) {
+      console.log('Cleaning up legacy products without key field...');
+      await Product.deleteMany({});
+    }
+
+    const count = await Product.countDocuments();
+    if (count === 0) {
+      const defaults = [
+        { name: 'Khichadi', key: 'khichadi', price: 5.0, image: 'khichadi.jpeg' },
+        { name: 'Pav Bhaji', key: 'pav_bhaji', price: 6.0, image: 'pav_bhaji.jpeg' },
+        { name: 'Papdi lot', key: 'lot', price: 3.0, image: 'Khichu-3.jpg' },
+        { name: 'Samosa Chat', key: 'chat', price: 5.0, image: 'chat.jpeg' },
+        { name: 'Cheese Pizza', key: 'cheese_pizza', price: 6.0, image: 'cheese_pizza.jpeg' },
+        { name: 'Veg Pizza', key: 'veg_pizza', price: 7.0, image: 'veg_pizza.webp' },
+        { name: 'Pesto Pizza', key: 'pesto', price: 8.0, image: 'pesto.jpeg' },
+        { name: 'Extra Pav', key: 'extra_pav', price: 1.0, image: 'extra_pav.jpeg' },
+        { name: 'Special Thali', key: 'thali', price: 10.0, image: 'thali.jpeg' },
+        { name: 'Lemonade', key: 'lemonade', price: 3.5, image: 'lemonade.jpeg' },
+        { name: 'Tea', key: 'tea', price: 2.5, image: 'tea.jpeg' },
+        { name: 'Coffee', key: 'coffee', price: 2.5, image: 'coffee.jpeg' },
+      ];
+      await Product.insertMany(defaults);
+      console.log('Successfully seeded default menu items!');
+      
+      // Also initialize stock count to '0' for seeded items if a StockOrder exists
+      const latestStock = await Stock.findOne().sort({ _id: -1 });
+      if (latestStock) {
+        const updateFields = {};
+        defaults.forEach(item => {
+          if (latestStock[item.key] === undefined) {
+            updateFields[item.key] = '0';
+          }
+        });
+        if (Object.keys(updateFields).length > 0) {
+          await Stock.findByIdAndUpdate(latestStock._id, { $set: updateFields });
+          console.log('Seeded items stock counts initialized in StockOrder!');
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error seeding default products:', err);
+  }
+};
 
 const db = {
   initialize: async (url) => {
     try {
       await mongoose.connect(url);
       console.log('Successfully connected to the database');
+      await seedDefaultProducts();
     } catch (err) {
       console.error('Error connecting to the database:', err);
     }
@@ -23,6 +72,69 @@ const db = {
   // get orders
   getAllOrders: () => {
     return Order.find();
+  },
+  getOrdersPaginated: async (page = 1, limit = 10, item = 'All', date = null) => {
+    const query = {};
+    
+    const getItemDbNames = (itemName) => {
+      const normalized = itemName.toLowerCase().replace(/[_\s-]+/g, ' ');
+      switch (normalized) {
+        case 'khichadi':
+          return ['khichadi', 'Khichadi'];
+        case 'pav bhaji':
+          return ['pav_bhaji', 'Pav Bhaji'];
+        case 'papadi no lot':
+        case 'papadi lot':
+        case 'papdi lot':
+        case 'lot':
+          return ['lot', 'papadi_no_lot', 'papadi lot', 'Papadi lot', 'Papadi no lot', 'Papadi Lot'];
+        case 'samosa':
+          return ['samosa', 'samosa_chat', 'chat', 'Samosa'];
+        case 'puff':
+          return ['puff', 'Puff'];
+        case 'dabeli':
+          return ['dabeli', 'Dabeli'];
+        default:
+          return [itemName, itemName.toLowerCase()];
+      }
+    };
+
+    if (item && item !== 'All') {
+      const matchNames = getItemDbNames(item);
+      query['orders.name'] = { $in: matchNames };
+    }
+    if (date) {
+      query['date'] = date;
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const [orders, totalOrders] = await Promise.all([
+      Order.find(query).skip(skip).limit(Number(limit)),
+      Order.countDocuments(query)
+    ]);
+
+    let totalQuantity = 0;
+    if (item && item !== 'All') {
+      const matchNames = getItemDbNames(item);
+      const aggResult = await Order.aggregate([
+        { $match: query },
+        { $unwind: '$orders' },
+        { $match: { 'orders.name': { $in: matchNames } } },
+        { $group: { _id: null, total: { $sum: '$orders.quantity' } } }
+      ]);
+      if (aggResult.length > 0) {
+        totalQuantity = aggResult[0].total;
+      }
+    }
+
+    return {
+      orders,
+      currentPage: Number(page),
+      totalPages: Math.ceil(totalOrders / Number(limit)),
+      totalOrders,
+      totalQuantity
+    };
   },
   getAllStock: () => {
     return Stock.find().sort({ createdAt: -1 }); // Assuming 'createdAt' is a timestamp field
@@ -111,6 +223,20 @@ const db = {
     } catch (error) {
       throw new Error(`Error deleting order form: ${error.message}`);
     }
+  },
+  getAllProducts: () => {
+    return Product.find();
+  },
+  addNewProduct: async (data) => {
+    const newProduct = new Product(data);
+    await newProduct.save();
+    return newProduct;
+  },
+  updateProduct: (id, data) => {
+    return Product.findByIdAndUpdate(id, data, { new: true });
+  },
+  deleteProduct: (id) => {
+    return Product.findByIdAndDelete(id);
   },
 };
 

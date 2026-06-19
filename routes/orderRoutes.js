@@ -11,8 +11,9 @@ router
   .route('/')
   .get(async (req, res) => {
     try {
-      const orders = await db.getAllOrders();
-      res.status(200).json(orders);
+      const { page = 1, limit = 10, item = 'All', date } = req.query;
+      const result = await db.getOrdersPaginated(page, limit, item, date || null);
+      res.status(200).json(result);
     } catch (err) {
       console.error('Error fetching orders:', err);
       res.status(500).json({ error: 'Internal Server Error' });

@@ -1,3 +1,4 @@
+require('dotenv').config();  // ← MUST be first so all process.env.* are available when modules load
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -8,7 +9,8 @@ const storeRoutes = require('./routes/storeRoutes');
 const storesRoutes = require('./routes/storesRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const orderFormRoutes = require('./routes/orderFormRoutes');
-require('dotenv').config();
+const productRoutes = require('./routes/productRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -17,40 +19,48 @@ const port = process.env.PORT || 8000;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// CORS configuration: Adjust this as per your needs
+// CORS configuration — must list explicit origins when credentials: true
 app.use(
   cors({
-    origin: '*', // Allow all origins
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed methods
+    origin: [
+      'https://shayona-orders.vercel.app',
+      'http://localhost:3000',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true, // Allow cookies to be sent with requests
+    credentials: true,
   })
 );
 
 app.use(cookieParser());
 
-// Connect to database before starting server
+// Register routes immediately at the top level (required for Vercel serverless)
+// On Vercel, routes MUST be registered before the first request hits.
+// Placing them inside db.initialize().then() caused a race condition.
 const db = require('./config/database');
+app.use('/api/items', itemRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/store-order', storeRoutes);
+app.use('/api/store', storesRoutes);
+app.use('/api/stock', stockRoutes);
+app.use('/api/orderForm', orderFormRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/upload', uploadRoutes);
+
+// Connect to database (non-blocking — does not delay route registration)
 db.initialize(process.env.DB_URL)
   .then(() => {
     console.log('Connected to MongoDB');
-
-    // Set up routes
-    app.use('/api/items', itemRoutes);
-    app.use('/api/orders', orderRoutes);
-    app.use('/api/store-order', storeRoutes);
-    app.use('/api/store', storesRoutes);
-    app.use('/api/stock', stockRoutes);
-    app.use('/api/orderForm', orderFormRoutes);
-
-    // Start the server
-    app.listen(port, () => {
-      console.log(`Server is running on port ${port}`);
-    });
   })
   .catch((err) => {
     console.error('Error connecting to the database:', err);
-    // Consider exiting the application here or implementing more robust error handling
   });
 
-module.exports = app; // Optional, if you need to export the app instance for testing
+// Start the server only in local development (Vercel serverless ignores app.listen)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
+
+module.exports = app;
