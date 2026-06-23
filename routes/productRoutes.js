@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 // POST /api/products
 router.post('/', async (req, res) => {
   try {
-    const { name, key, price, image, imageUrl } = req.body;
+    const { name, key, price, image, imageUrl, sortOrder } = req.body;
 
     if (!name || price === undefined) {
       return res.status(400).json({ error: 'Missing required fields (name, price)' });
@@ -36,6 +36,7 @@ router.post('/', async (req, res) => {
       price: Number(price),
       image: image || 'default_item.jpeg',
       imageUrl: imageUrl || '',
+      sortOrder: sortOrder !== undefined ? Number(sortOrder) : undefined,
     });
 
     // Automatically initialize stock to '0' in the latest StockOrder document
@@ -56,10 +57,25 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT /api/products/reorder
+router.put('/reorder', async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ error: 'orderedIds must be an array' });
+    }
+    await db.reorderProducts(orderedIds);
+    res.status(200).json({ message: 'Products reordered successfully' });
+  } catch (err) {
+    console.error('Error reordering products:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // PUT /api/products/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { name, key, price, image, imageUrl } = req.body;
+    const { name, key, price, image, imageUrl, sortOrder } = req.body;
     const updateData = {};
     if (name) updateData.name = name;
     if (key) {
@@ -72,6 +88,7 @@ router.put('/:id', async (req, res) => {
     if (price !== undefined) updateData.price = Number(price);
     if (image) updateData.image = image;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+    if (sortOrder !== undefined) updateData.sortOrder = Number(sortOrder);
 
     const updatedProduct = await db.updateProduct(req.params.id, updateData);
     if (!updatedProduct) {

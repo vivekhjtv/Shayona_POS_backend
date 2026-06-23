@@ -7,6 +7,7 @@ const ProductSchema = new Schema({
   price: { type: Number, required: true },
   image: { type: String, default: 'default_item.jpeg' },     // fallback local filename
   imageUrl: { type: String, default: '' },                   // Cloudinary URL (preferred)
+  sortOrder: { type: Number, default: 0 },
 });
 
 module.exports = mongoose.model('Product', ProductSchema);

@@ -18,18 +18,18 @@ const seedDefaultProducts = async () => {
     const count = await Product.countDocuments();
     if (count === 0) {
       const defaults = [
-        { name: 'Khichadi', key: 'khichadi', price: 5.0, image: 'khichadi.jpeg' },
-        { name: 'Pav Bhaji', key: 'pav_bhaji', price: 6.0, image: 'pav_bhaji.jpeg' },
-        { name: 'Papdi lot', key: 'lot', price: 3.0, image: 'Khichu-3.jpg' },
-        { name: 'Samosa Chat', key: 'chat', price: 5.0, image: 'chat.jpeg' },
-        { name: 'Cheese Pizza', key: 'cheese_pizza', price: 6.0, image: 'cheese_pizza.jpeg' },
-        { name: 'Veg Pizza', key: 'veg_pizza', price: 7.0, image: 'veg_pizza.webp' },
-        { name: 'Pesto Pizza', key: 'pesto', price: 8.0, image: 'pesto.jpeg' },
-        { name: 'Extra Pav', key: 'extra_pav', price: 1.0, image: 'extra_pav.jpeg' },
-        { name: 'Special Thali', key: 'thali', price: 10.0, image: 'thali.jpeg' },
-        { name: 'Lemonade', key: 'lemonade', price: 3.5, image: 'lemonade.jpeg' },
-        { name: 'Tea', key: 'tea', price: 2.5, image: 'tea.jpeg' },
-        { name: 'Coffee', key: 'coffee', price: 2.5, image: 'coffee.jpeg' },
+        { name: 'Khichadi', key: 'khichadi', price: 5.0, image: 'khichadi.jpeg', sortOrder: 0 },
+        { name: 'Pav Bhaji', key: 'pav_bhaji', price: 6.0, image: 'pav_bhaji.jpeg', sortOrder: 1 },
+        { name: 'Papdi lot', key: 'lot', price: 3.0, image: 'Khichu-3.jpg', sortOrder: 2 },
+        { name: 'Samosa Chat', key: 'chat', price: 5.0, image: 'chat.jpeg', sortOrder: 3 },
+        { name: 'Cheese Pizza', key: 'cheese_pizza', price: 6.0, image: 'cheese_pizza.jpeg', sortOrder: 4 },
+        { name: 'Veg Pizza', key: 'veg_pizza', price: 7.0, image: 'veg_pizza.webp', sortOrder: 5 },
+        { name: 'Pesto Pizza', key: 'pesto', price: 8.0, image: 'pesto.jpeg', sortOrder: 6 },
+        { name: 'Extra Pav', key: 'extra_pav', price: 1.0, image: 'extra_pav.jpeg', sortOrder: 7 },
+        { name: 'Special Thali', key: 'thali', price: 10.0, image: 'thali.jpeg', sortOrder: 8 },
+        { name: 'Lemonade', key: 'lemonade', price: 3.5, image: 'lemonade.jpeg', sortOrder: 9 },
+        { name: 'Tea', key: 'tea', price: 2.5, image: 'tea.jpeg', sortOrder: 10 },
+        { name: 'Coffee', key: 'coffee', price: 2.5, image: 'coffee.jpeg', sortOrder: 11 },
       ];
       await Product.insertMany(defaults);
       console.log('Successfully seeded default menu items!');
@@ -60,6 +60,15 @@ const db = {
       await mongoose.connect(url);
       console.log('Successfully connected to the database');
       await seedDefaultProducts();
+
+      // Legacy migration: ensure all products have a sortOrder
+      const productsWithoutOrder = await Product.find({ sortOrder: { $exists: false } });
+      if (productsWithoutOrder.length > 0) {
+        console.log(`Initializing sortOrder for ${productsWithoutOrder.length} products...`);
+        for (let i = 0; i < productsWithoutOrder.length; i++) {
+          await Product.findByIdAndUpdate(productsWithoutOrder[i]._id, { $set: { sortOrder: i } });
+        }
+      }
     } catch (err) {
       console.error('Error connecting to the database:', err);
     }
@@ -225,9 +234,13 @@ const db = {
     }
   },
   getAllProducts: () => {
-    return Product.find();
+    return Product.find().sort({ sortOrder: 1, name: 1 });
   },
   addNewProduct: async (data) => {
+    if (data.sortOrder === undefined) {
+      const lastProduct = await Product.findOne().sort({ sortOrder: -1 });
+      data.sortOrder = lastProduct ? (lastProduct.sortOrder || 0) + 1 : 0;
+    }
     const newProduct = new Product(data);
     await newProduct.save();
     return newProduct;
@@ -237,6 +250,17 @@ const db = {
   },
   deleteProduct: (id) => {
     return Product.findByIdAndDelete(id);
+  },
+  reorderProducts: async (orderedIds) => {
+    const bulkOps = orderedIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: new mongoose.Types.ObjectId(id) },
+        update: { $set: { sortOrder: index } },
+      },
+    }));
+    if (bulkOps.length > 0) {
+      await Product.bulkWrite(bulkOps);
+    }
   },
 };
 
